@@ -35,7 +35,7 @@ public class Project {
     @Basic(fetch = FetchType.LAZY, optional = false)
     private byte[] preview;
 
-    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY, mappedBy = "project")
+    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY, mappedBy = "project", orphanRemoval = true)
     @OnDelete(action = OnDeleteAction.CASCADE)
     private List<ProjectColumn> columns;
 
@@ -46,8 +46,10 @@ public class Project {
         this.preview = preview;
     }
 
-    public void addColumn(ProjectColumn projectColumn) {
+    public ProjectColumn addColumn(ProjectColumn projectColumn) {
         projectColumn.setIndex(columns.size());
         columns.add(projectColumn);
+
+        return projectColumn;
     }
 }

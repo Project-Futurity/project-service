@@ -31,7 +31,7 @@ public class Task {
 
     private ZonedDateTime deadline;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "column_id", nullable = false)
     private ProjectColumn column;
 

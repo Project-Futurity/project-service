@@ -2,13 +2,13 @@ package com.alex.futurity.projectserver.service;
 
 import com.alex.futurity.projectserver.dto.CreationTaskDto;
 import com.alex.futurity.projectserver.dto.ProjectColumnDto;
-import com.alex.futurity.projectserver.entity.Project;
 import com.alex.futurity.projectserver.entity.ProjectColumn;
 import com.alex.futurity.projectserver.entity.Task;
 import com.alex.futurity.projectserver.exception.ClientSideException;
+import com.alex.futurity.projectserver.model.UserProject;
 import com.alex.futurity.projectserver.repo.ColumnRepository;
-import com.alex.futurity.projectserver.service.ProjectService;
 import lombok.AllArgsConstructor;
+import lombok.NonNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -16,52 +16,42 @@ import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
 public class ColumnService {
-    private ProjectService projectService;
-    private ColumnRepository columnRepo;
-    private static final String NOT_FOUND_MESSAGE = "The column is associated with such data does not exist";
+    private final ProjectService projectService;
+    private final ColumnRepository columnRepo;
+    private static final String NOT_FOUND_MESSAGE = "The column is associated with such data does not exist: %s";
 
-    public long createColumn(long userId, long projectId, String columnName) {
-        ProjectColumn projectColumn = projectService.addColumnToProject(userId, projectId, columnName);
-
-        return projectColumn.getId();
+    public long createColumn(@NonNull UserProject project, @NonNull String columnName) {
+        return projectService.addColumnToProject(project, columnName).getId();
     }
 
     @Transactional
-    public List<ProjectColumnDto> getColumns(long userId, long projectId) {
-        List<ProjectColumn> columns = findProjectColumnsForProject(projectId, userId, false);
-
-        return columns.stream()
+    public List<ProjectColumnDto> getColumns(@NonNull UserProject project) {
+        return getColumnsByProject(project)
+                .stream()
                 .map(ProjectColumnDto::fromProjectColumn)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-
     @Transactional
-    public void deleteColumn(long userId, long projectId, long columnId) {
-        List<ProjectColumn> columns = findProjectColumnsForProject(projectId, userId, true);
-        ProjectColumn columnToDelete = columns.stream()
-                .filter(column -> column.getId() == columnId)
-                .findFirst()
-                .orElseThrow(() -> new ClientSideException(NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
+    public void deleteColumn(@NonNull UserProject project, @NonNull Long columnId) {
+        List<ProjectColumn> columns = getColumnsByProject(project);
 
         columns.stream()
-                .filter(column -> column.getIndex() > columnToDelete.getIndex())
-                .forEach(column -> column.setIndex(column.getIndex() - 1));
-
-        columnRepo.delete(columnToDelete);
+                .filter(column -> Objects.equals(column.getId(), columnId))
+                .findFirst()
+                .ifPresent(column -> deleteAndShift(column, columns));
     }
 
 
     @Transactional
-    public void changeColumnIndex(long userId, long projectId, int from, int to) {
-        List<ProjectColumn> columns = findProjectColumnsForProject(projectId, userId, true);
+    public void changeColumnIndex(@NonNull UserProject project, @NonNull Integer from, @NonNull Integer to) {
+        List<ProjectColumn> columns = getColumnsByProject(project);
 
-        if (from < 0 || from > columns.size() || to < 0 || to > columns.size() + 1 || from == to) {
+        if (from > columns.size() || to > columns.size() + 1) {
             throw new ClientSideException("Columns out of bounds", HttpStatus.BAD_REQUEST);
         }
 
@@ -70,67 +60,61 @@ public class ColumnService {
 
         if (from < to) {
             columns.stream()
-                    .filter(column -> column.getIndex() >= from && column.getIndex() <= to
-                            && !Objects.equals(columnFrom.getId(), column.getId()))
+                    .filter(column -> !Objects.equals(columnFrom.getId(), column.getId()))
+                    .filter(column -> column.getIndex() >= from && column.getIndex() <= to)
                     .forEach(column -> column.setIndex(column.getIndex() - 1));
         } else {
             columns.stream()
-                    .filter(column -> column.getIndex() >= to && column.getIndex() <= from
-                            && !Objects.equals(columnFrom.getId(), column.getId()))
+                    .filter(column -> !Objects.equals(columnFrom.getId(), column.getId()))
+                    .filter(column -> column.getIndex() >= to && column.getIndex() <= from)
                     .forEach(column -> column.setIndex(column.getIndex() + 1));
         }
     }
 
     @Transactional
-    public Task addTaskToColumn(long userId, long projectId, long columnId, CreationTaskDto creationTaskDto) {
-        ProjectColumn column = findColumnByColumnId(projectId, userId, columnId);
-        Task task = new Task(creationTaskDto.getName(), creationTaskDto.getDeadline(), column);
-        column.addTask(task);
-        return task;
+    public Task addTaskToColumn(@NonNull CreationTaskDto creationTaskDto, @NonNull Long columnId) {
+        return columnRepo.findById(columnId)
+                .map(column -> column.addTask(new Task(creationTaskDto.getName(), creationTaskDto.getDeadline(), column)))
+                .orElseThrow(() -> buildException(columnId));
     }
 
     @Transactional
-    public void changeColumnName(long userId, long projectId, long columnId, String columnName) {
-        ProjectColumn column = findColumnByColumnId(projectId, userId, columnId);
-        column.setName(columnName);
+    public void changeColumnName(@NonNull Long columnId, String columnName) {
+        columnRepo.findById(columnId)
+                .ifPresent(column -> column.setName(columnName));
     }
 
-    public List<Task> getTasksFromColumn(long userId, long projectId, long columnId) {
-        ProjectColumn projectColumn = findColumnByColumnId(projectId, userId, columnId);
-
-        return projectColumn.getTasks();
+    public ProjectColumn getColumnByIndex(@NonNull UserProject project, @NonNull Integer columnIndex) {
+        return getColumnsByProject(project)
+                .stream()
+                .filter(projectColumn -> Objects.equals(columnIndex, projectColumn.getIndex()))
+                .findFirst()
+                .orElseThrow(() -> new ClientSideException("Not Found by user project: " + project, HttpStatus.NOT_FOUND));
     }
 
     @Transactional
-    public void markColumnAsDone(long userId, long projectId, long columnToMark, Long columnToUnmark) {
-        ProjectColumn column = findColumnByColumnId(projectId, userId, columnToMark);
-        column.setDoneColumn(true);
+    public void markColumnAsDone(@NonNull Long columnToMark, Long columnToUnmark) {
+        columnRepo.findById(columnToMark)
+                        .ifPresent(column -> column.setDoneColumn(true));
 
-        Optional.ofNullable(columnToUnmark).ifPresent(id -> {
-            ProjectColumn colToUnmark = findColumnByColumnId(projectId, userId, id);
-            colToUnmark.setDoneColumn(false);
-        });
+        Optional.ofNullable(columnToUnmark)
+                .flatMap(columnRepo::findById)
+                .ifPresent(column -> column.setDoneColumn(false));
     }
 
-    private List<ProjectColumn> findProjectColumnsForProject(long projectId, long userId, boolean checkSize) {
-        List<ProjectColumn> columns = columnRepo.findAllByProjectIdAndProjectUserIdOrderByIndex(projectId, userId);
-
-        if (columns.isEmpty() && checkSize) {
-            throw new ClientSideException(NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND);
-        }
-
-        return columns;
+    private List<ProjectColumn> getColumnsByProject(UserProject project) {
+        return columnRepo.findAllByProject(project.getUserId(), project.getProjectId());
     }
 
-    private ProjectColumn findColumnByColumnId(long projectId, long userId, long columnId) {
-        ProjectColumn projectColumn = columnRepo.findById(columnId)
-                .orElseThrow(() -> new ClientSideException(NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
-        Project project = projectColumn.getProject();
+    private void deleteAndShift(ProjectColumn columnToDelete, List<ProjectColumn> columns) {
+        columnRepo.delete(columnToDelete);
 
-        if (project.getId() != projectId || project.getUserId() != userId) {
-            throw new ClientSideException(NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND);
-        }
+        columns.stream()
+                .filter(column -> column.getIndex() > columnToDelete.getIndex())
+                .forEach(column -> column.setIndex(column.getIndex() - 1));
+    }
 
-        return projectColumn;
+    private ClientSideException buildException(Long columnId) {
+        return new ClientSideException(NOT_FOUND_MESSAGE.formatted(columnId), HttpStatus.NOT_FOUND);
     }
 }

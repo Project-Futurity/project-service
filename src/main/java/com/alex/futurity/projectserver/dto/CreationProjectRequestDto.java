@@ -23,7 +23,15 @@ public class CreationProjectRequestDto {
     @Null
     private Long userId;
 
-    public Project toProject() throws IOException {
-        return new Project(userId, name, description, preview.getBytes());
+    public Project toProject() {
+        return new Project(userId, name, description, readPreview());
+    }
+
+    private byte[] readPreview() {
+        try {
+            return preview.getBytes();
+        } catch (IOException e) {
+            throw new IllegalStateException("The preview cannot be read", e);
+        }
     }
 }

@@ -1,10 +1,11 @@
 package com.alex.futurity.projectserver.dto;
-import lombok.Data;
+import lombok.NonNull;
+import lombok.Value;
 
-@Data
+@Value
 public class ChangeTaskIndexRequestDto {
-    private int fromColumn;
-    private int toColumn;
-    private int from;
-    private int to;
+    @NonNull Integer fromColumn;
+    @NonNull Integer toColumn;
+    @NonNull Integer from;
+    @NonNull Integer to;
 }

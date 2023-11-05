@@ -115,7 +115,7 @@ class ProjectControllerIntegrationTest {
     @DisplayName("Should return projects by id")
     void testGetProjectsByUserId() {
         long id = 1L;
-        Project project = new Project(id, VALID_NAME, VALID_DESCRIPTION, VALID_NAME.getBytes());
+        Project project = new Project(id, VALID_NAME, VALID_DESCRIPTION, VALID_PREVIEW.getBytes());
         createProject(project);
         long projectId = getProject().getId();
 
@@ -155,7 +155,7 @@ class ProjectControllerIntegrationTest {
         mockMvc.perform(get("/1/preview/1"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().string(
-                        objectMapper.writeValueAsString(new ErrorMessage("The project is associated with such data does not exist"))
+                        objectMapper.writeValueAsString(new ErrorMessage("The project is associated with such data does not exist: 1 1"))
                 ));
     }
 
@@ -182,7 +182,7 @@ class ProjectControllerIntegrationTest {
         mockMvc.perform(delete("/1/delete/1"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().json(
-                        objectMapper.writeValueAsString(new ErrorMessage("The project is associated with such data does not exist"))
+                        objectMapper.writeValueAsString(new ErrorMessage("The project is associated with such data does not exist: 1 1"))
                 ));
     }
 

@@ -1,6 +1,7 @@
 package com.alex.futurity.projectserver.controller;
 
 import com.alex.futurity.projectserver.dto.*;
+import com.alex.futurity.projectserver.model.UserProject;
 import com.alex.futurity.projectserver.service.ProjectService;
 import com.alex.futurity.projectserver.validation.FileNotEmpty;
 import com.alex.futurity.projectserver.validation.FileSize;
@@ -54,7 +55,7 @@ public class ProjectController {
     public ResponseEntity<Resource> getPreview(@PathVariable long userId, @PathVariable(name = "previewId") long projectId) {
         log.info("Handling getting project preview. User id: {}, project id: {}", userId, projectId);
 
-        return ResponseEntity.ok(projectService.findProjectPreview(userId, projectId));
+        return ResponseEntity.ok(projectService.findProjectPreview(UserProject.of(userId, projectId)));
     }
 
     @DeleteMapping("/{userId}/delete/{projectId}")
@@ -62,7 +63,7 @@ public class ProjectController {
     public void deleteProject(@PathVariable long userId, @PathVariable long projectId) {
         log.info("Handling deleting project. User id: {}, project id: {}", userId, projectId);
 
-        projectService.deleteProject(userId, projectId);
+        projectService.deleteProject(UserProject.of(userId, projectId));
     }
 
     @PatchMapping("/{userId}/{projectId}/name")
@@ -70,15 +71,16 @@ public class ProjectController {
     public void changeProjectName(@PathVariable long userId, @PathVariable long projectId, @Valid @RequestBody RequestStringDto projectName) {
         log.info("Handling changing project name. User id: {}, project id: {}, project name: {}", userId, projectId, projectName.getValue());
 
-        projectService.changeProjectName(userId, projectId, projectName.getValue());
+        projectService.changeProjectName(UserProject.of(userId, projectId), projectName.getValue());
     }
 
     @PatchMapping("/{userId}/{projectId}/description")
     @ResponseStatus(HttpStatus.OK)
-    public void changeProjectDescription(@PathVariable long userId, @PathVariable long projectId, @Valid @RequestBody RequestStringDto projectDescription) {
+    public void changeProjectDescription(@PathVariable long userId, @PathVariable long projectId,
+                                         @Valid @RequestBody RequestStringDto projectDescription) {
         log.info("Handling changing project description. User id: {}, project id: {}, project description: {}",
                 userId, projectId, projectDescription.getValue());
 
-        projectService.changeProjectDescription(userId, projectId, projectDescription.getValue());
+        projectService.changeProjectDescription(UserProject.of(userId, projectId), projectDescription.getValue());
     }
 }

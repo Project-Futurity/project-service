@@ -11,6 +11,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+
 import java.util.List;
 
 @Entity
@@ -32,7 +33,7 @@ public class ProjectColumn {
     @Min(value = 0, message = "Wrong index number. Index number must start from 0")
     private Integer index;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
 
@@ -48,8 +49,10 @@ public class ProjectColumn {
         this.project = project;
     }
 
-    public void addTask(Task task) {
+    public Task addTask(Task task) {
         task.setIndex(tasks.size());
         tasks.add(task);
+
+        return task;
     }
 }
