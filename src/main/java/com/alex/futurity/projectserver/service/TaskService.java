@@ -1,12 +1,13 @@
 package com.alex.futurity.projectserver.service;
 
+import com.alex.futurity.projectserver.dao.TaskDao;
 import com.alex.futurity.projectserver.dto.ChangeTaskIndexRequestDto;
 import com.alex.futurity.projectserver.dto.CreationTaskDto;
 import com.alex.futurity.projectserver.entity.ProjectColumn;
 import com.alex.futurity.projectserver.entity.Task;
 import com.alex.futurity.projectserver.exception.ClientSideException;
+import com.alex.futurity.projectserver.message.TaskEventPublisher;
 import com.alex.futurity.projectserver.model.UserProject;
-import com.alex.futurity.projectserver.repo.TaskRepository;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import org.springframework.http.HttpStatus;
@@ -23,22 +24,23 @@ import java.util.Objects;
 @AllArgsConstructor
 public class TaskService {
     private final ColumnService columnService;
-    private final TaskRepository taskRepo;
+    private final TaskEventPublisher eventPublisher;
+    private final TaskDao taskDao;
 
     public long createTask(@NonNull CreationTaskDto creationTaskDto, @NonNull Long columnId) {
-        return columnService.addTaskToColumn(creationTaskDto, columnId).getId();
+        Task task = columnService.addTaskToColumn(creationTaskDto, columnId);
+        if (task.hasDeadline() && !task.isCompleted()) {
+            eventPublisher.publishCreationEvent(task);
+        }
+
+        return task.getId();
     }
 
-    @Transactional
     public void deleteTask(long columnId, long taskId) {
-        List<Task> tasks = taskRepo.findAllByColumnId(columnId);
-
-        tasks.stream()
-                .filter(task -> task.getId().equals(taskId))
-                .findFirst()
-                .ifPresent(task -> deleteAndShift(task, tasks));
+        taskDao.deleteTask(columnId, taskId)
+                .filter(task -> task.hasDeadline() && !task.isCompleted())
+                .ifPresent(eventPublisher::publishDeleteEvent);
     }
-
 
     @Transactional
     public void changeTaskIndex(@NonNull UserProject userProject, @NonNull ChangeTaskIndexRequestDto request) {
@@ -71,8 +73,10 @@ public class TaskService {
             tasksFrom.stream()
                     .filter(t -> t.getIndex() > request.getFrom())
                     .forEach(t -> t.setIndex(t.getIndex() - 1));
-            task.setIndex(request.getTo());
-            task.setColumn(columnTo);
+            task.setIndex(request.getTo())
+                    .setColumn(columnTo)
+                    .setCompleted(columnTo.isDoneColumn());
+            publishTaskEvent(columnFrom, columnTo, task);
 
             tasksTo.stream()
                     .filter(t -> t.getIndex() >= request.getTo())
@@ -80,25 +84,19 @@ public class TaskService {
         }
     }
 
-
-    @Transactional
     public void changeTaskName(@NonNull Long taskId, @NonNull String taskName) {
-        taskRepo.findById(taskId)
-                        .ifPresent(task -> task.setName(taskName));
+        taskDao.changeTaskName(taskId, taskName);
     }
 
-
-    @Transactional
     public void changeTaskDeadline(@NonNull Long taskId, ZonedDateTime deadline) {
-        taskRepo.findById(taskId)
-                .ifPresent(task -> task.setDeadline(deadline));
+        taskDao.changeTaskDeadline(taskId, deadline)
+                .filter(task -> !task.isCompleted())
+                .ifPresent(eventPublisher::publishUpdateEvent);
     }
 
-    private void deleteAndShift(Task taskToDelete, List<Task> tasks) {
-        taskRepo.delete(taskToDelete);
-
-        tasks.stream()
-                .filter(task -> task.getIndex() > taskToDelete.getIndex())
-                .forEach(task -> task.setIndex(task.getIndex() - 1));
+    private void publishTaskEvent(ProjectColumn columnFrom, ProjectColumn columnTo, Task task) {
+        if (task.hasDeadline() && (columnFrom.isDoneColumn() || columnTo.isDoneColumn())) {
+            eventPublisher.publishUpdateEvent(task);
+        }
     }
 }

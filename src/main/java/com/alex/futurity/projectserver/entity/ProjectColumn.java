@@ -4,6 +4,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.Accessors;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
@@ -17,6 +18,7 @@ import java.util.List;
 @Entity
 @Getter
 @Setter
+@Accessors(chain = true)
 @NoArgsConstructor
 @EqualsAndHashCode
 public class ProjectColumn {

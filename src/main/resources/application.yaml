@@ -1,4 +1,23 @@
 spring:
+  application:
+    name: project-service
+  rabbitmq:
+    username: ${RABBIT_USERNAME}
+    password: ${RABBIT_PASSWORD}
+  cloud:
+    stream:
+      bindings:
+        taskPublisher:
+          destination: task
+      rabbit:
+        default:
+          producer:
+            declare-exchange: false
+            exchange-type: direct
+            routing-key-expression: headers['type']
+        binder:
+          nodes: ${RABBIT_NODE}
+      output-bindings: taskPublisher
   jpa:
     hibernate:
       ddl-auto: validate
