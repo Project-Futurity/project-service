@@ -1,5 +1,4 @@
 spring:
-  hibernate:
-    ddl-auto: create-drop
-  multipart:
-    max-file-size: 10MB
+  jpa:
+    hibernate:
+      ddl-auto: create-drop

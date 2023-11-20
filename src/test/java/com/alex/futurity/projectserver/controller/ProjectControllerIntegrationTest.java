@@ -64,11 +64,12 @@ class ProjectControllerIntegrationTest {
     @SneakyThrows
     @DisplayName("Should create project if a project request is valid")
     void testCreateProject() {
-        Long id = 1L;
+        Long userId = 1L;
         CreationProjectRequestDto dto = new CreationProjectRequestDto(VALID_NAME, VALID_DESCRIPTION, null, null);
-        String content = mockMvc.perform(multipart("/" + id + "/create")
+        String content = mockMvc.perform(multipart("/create")
                         .file(VALID_PREVIEW)
-                        .part(buildMockPart(dto)))
+                        .part(buildMockPart(dto))
+                        .header("user_id", userId))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
@@ -77,7 +78,7 @@ class ProjectControllerIntegrationTest {
         assertThat(getProject())
                 .returns(Long.parseLong(content), Project::getId)
                 .returns(VALID_NAME, Project::getName)
-                .returns(id, Project::getUserId)
+                .returns(userId, Project::getUserId)
                 .returns(VALID_DESCRIPTION, Project::getDescription)
                 .returns(VALID_PREVIEW.getBytes(), Project::getPreview);
     }
@@ -87,9 +88,10 @@ class ProjectControllerIntegrationTest {
     @SneakyThrows
     @DisplayName("Should return error if a project request is invalid")
     void testCreateProjectWithInvalidRequest(CreationProjectRequestDto dto, MockMultipartFile preview, ErrorMessage message) {
-        mockMvc.perform(multipart("/1/create")
+        mockMvc.perform(multipart("/create")
                         .file(preview)
-                        .part(buildMockPart(dto)))
+                        .part(buildMockPart(dto))
+                        .header("user_id", 1L))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().json(objectMapper.writeValueAsString(message)));
     }
@@ -98,14 +100,15 @@ class ProjectControllerIntegrationTest {
     @SneakyThrows
     @DisplayName("Should return error if the project with the same name exist")
     void testCreateProjectWithExistingName() {
-        long id = 1L;
-        Project project = new Project(id, VALID_NAME, VALID_DESCRIPTION, VALID_PREVIEW.getBytes());
+        long userId = 1L;
+        Project project = new Project(userId, VALID_NAME, VALID_DESCRIPTION, VALID_PREVIEW.getBytes());
         createProject(project);
         CreationProjectRequestDto dto = new CreationProjectRequestDto(VALID_NAME, VALID_DESCRIPTION, null, null);
 
-        mockMvc.perform(multipart("/" + id + "/create")
+        mockMvc.perform(multipart("/create")
                         .file(VALID_PREVIEW)
-                        .part(buildMockPart(dto)))
+                        .part(buildMockPart(dto))
+                        .header("user_id", userId))
                 .andExpect(status().isConflict())
                 .andExpect(content().json(objectMapper.writeValueAsString(new ErrorMessage("Project with such name exists"))));
     }
@@ -114,12 +117,13 @@ class ProjectControllerIntegrationTest {
     @SneakyThrows
     @DisplayName("Should return projects by id")
     void testGetProjectsByUserId() {
-        long id = 1L;
-        Project project = new Project(id, VALID_NAME, VALID_DESCRIPTION, VALID_PREVIEW.getBytes());
+        long userId = 1L;
+        Project project = new Project(userId, VALID_NAME, VALID_DESCRIPTION, VALID_PREVIEW.getBytes());
         createProject(project);
         long projectId = getProject().getId();
 
-        String result = mockMvc.perform(get("/" + id + "/projects"))
+        String result = mockMvc.perform(get("/projects")
+                        .header("user_id", userId))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -128,7 +132,7 @@ class ProjectControllerIntegrationTest {
         List<ProjectDto> projects = objectMapper.readValue(result, new TypeReference<List<ProjectDto>>() {});
         assertThat(projects)
                 .singleElement()
-                .returns(id, ProjectDto::getId)
+                .returns(userId, ProjectDto::getId)
                 .returns(VALID_DESCRIPTION, ProjectDto::getDescription)
                 .returns(VALID_NAME, ProjectDto::getName)
                 .returns("/preview/" + projectId, ProjectDto::getPreviewUrl);
@@ -138,12 +142,13 @@ class ProjectControllerIntegrationTest {
     @SneakyThrows
     @DisplayName("Should load the preview")
     void testGetPreview() {
-        long id = 1L;
-        Project project = new Project(id, VALID_NAME, VALID_DESCRIPTION, VALID_PREVIEW.getBytes());
+        long userId = 1L;
+        Project project = new Project(userId, VALID_NAME, VALID_DESCRIPTION, VALID_PREVIEW.getBytes());
         createProject(project);
         long projectId = getProject().getId();
 
-        mockMvc.perform(get("/" + id + "/preview/" + projectId))
+        mockMvc.perform(get("/preview/" + projectId)
+                        .header("user_id", userId))
                 .andExpect(status().isOk())
                 .andExpect(content().bytes(VALID_PREVIEW.getBytes()));
     }
@@ -152,7 +157,8 @@ class ProjectControllerIntegrationTest {
     @SneakyThrows
     @DisplayName("Should return error if review is not found")
     void testGetNotExistingPreview() {
-        mockMvc.perform(get("/1/preview/1"))
+        mockMvc.perform(get("/preview/1")
+                        .header("user_id", 1L))
                 .andExpect(status().isNotFound())
                 .andExpect(content().string(
                         objectMapper.writeValueAsString(new ErrorMessage("The project is associated with such data does not exist: 1 1"))
@@ -163,12 +169,13 @@ class ProjectControllerIntegrationTest {
     @SneakyThrows
     @DisplayName("Should delete project if it exists")
     void testDeleteProject() {
-        long id = 1L;
-        Project project = new Project(id, VALID_NAME, VALID_DESCRIPTION, VALID_NAME.getBytes());
+        long userId = 1L;
+        Project project = new Project(userId, VALID_NAME, VALID_DESCRIPTION, VALID_NAME.getBytes());
         createProject(project);
         long projectId = getProject().getId();
 
-        mockMvc.perform(delete("/" + id + "/delete/" + projectId))
+        mockMvc.perform(delete("/delete/" + projectId)
+                        .header("user_id", userId))
                 .andExpect(status().isOk());
 
         List<Project> projects = projectRepository.findAll();
@@ -179,7 +186,8 @@ class ProjectControllerIntegrationTest {
     @SneakyThrows
     @DisplayName("Should return an error if a project is not found")
     void testDeleteNotExistingProject() {
-        mockMvc.perform(delete("/1/delete/1"))
+        mockMvc.perform(delete("/delete/1")
+                        .header("user_id", 1L))
                 .andExpect(status().isNotFound())
                 .andExpect(content().json(
                         objectMapper.writeValueAsString(new ErrorMessage("The project is associated with such data does not exist: 1 1"))
