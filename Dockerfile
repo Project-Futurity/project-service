@@ -1,6 +1,5 @@
-FROM maven:3.8.5-jdk-11-slim
+FROM openjdk:17-alpine
 
-WORKDIR app
-COPY . .
+COPY target/project-service-1.0.jar application.jar
 
-ENTRYPOINT ["mvn", "spring-boot:run"]
+CMD java -jar /application.jar
