@@ -1,8 +1,8 @@
 package com.alex.futurity.projectserver.message;
 
+import com.alex.futurity.projectserver.context.UserContext;
 import com.alex.futurity.projectserver.entity.Task;
 import com.alex.futurity.projectserver.message.model.*;
-import com.alex.futurity.projectserver.service.UserService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.stream.function.StreamBridge;
@@ -15,14 +15,13 @@ import org.springframework.stereotype.Component;
 @AllArgsConstructor
 public class TaskEventPublisher {
     private final StreamBridge streamBridge;
-    private final UserService userService;
     private static final String BINDER_NAME = "taskPublisher";
 
     public void publishCreationEvent(Task task) {
         CreationTaskEvent event = CreationTaskEvent.builder()
                 .id(task.getId())
                 .deadline(task.getDeadline())
-                .userId(getUserId(task))
+                .userId(UserContext.getUserId())
                 .build();
 
         publish(event, TaskRoutingKey.CREATED);
@@ -33,7 +32,7 @@ public class TaskEventPublisher {
                 .id(task.getId())
                 .deadline(task.getDeadline())
                 .completed(task.isCompleted())
-                .userId(getUserId(task))
+                .userId(UserContext.getUserId())
                 .build();
 
         publish(event, TaskRoutingKey.UPDATED);
@@ -48,6 +47,10 @@ public class TaskEventPublisher {
     }
 
     private void publish(TaskEvent taskEvent, TaskRoutingKey routingKey) {
+        if (!UserContext.hasTelegram()) {
+            return;
+        }
+
         Message<TaskEvent> message = MessageBuilder
                 .withPayload(taskEvent)
                 .setHeader(TaskRoutingKey.HEADER_NAME, routingKey.getRoutingKey())
@@ -55,9 +58,5 @@ public class TaskEventPublisher {
 
         streamBridge.send(BINDER_NAME, message);
         log.info("Task with id {} and key {} has been published", taskEvent.getId(), routingKey.getRoutingKey());
-    }
-
-    private Long getUserId(Task task) {
-        return userService.findUserByTask(task);
     }
 }

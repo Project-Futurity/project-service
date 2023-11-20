@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -46,7 +47,10 @@ public class ColumnService {
 
     @Transactional
     public void changeColumnIndex(@NonNull UserProject project, @NonNull Integer from, @NonNull Integer to) {
-        List<ProjectColumn> columns = columnDao.getColumnsByProject(project);
+        List<ProjectColumn> columns = columnDao.getColumnsByProject(project)
+                .stream()
+                .sorted(Comparator.comparingInt(ProjectColumn::getIndex))
+                .toList();
 
         if (from > columns.size() || to > columns.size() + 1) {
             throw new ClientSideException("Columns out of bounds", HttpStatus.BAD_REQUEST);

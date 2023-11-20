@@ -16,8 +16,12 @@ import java.util.Optional;
 public class TaskDao {
     private final TaskRepository taskRepo;
 
+    public Optional<Task> findTaskById(@NonNull Long taskId) {
+        return taskRepo.findById(taskId);
+    }
+
     @Transactional
-    public Optional<Task> deleteTask(long columnId, long taskId) {
+    public Optional<Task> deleteTask(@NonNull Long columnId, @NonNull Long taskId) {
         List<Task> tasks = taskRepo.findAllByColumnId(columnId);
 
         return tasks.stream()

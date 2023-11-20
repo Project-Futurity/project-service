@@ -3,6 +3,7 @@ package com.alex.futurity.projectserver.service;
 import com.alex.futurity.projectserver.dao.TaskDao;
 import com.alex.futurity.projectserver.dto.ChangeTaskIndexRequestDto;
 import com.alex.futurity.projectserver.dto.CreationTaskDto;
+import com.alex.futurity.projectserver.dto.TaskDto;
 import com.alex.futurity.projectserver.entity.ProjectColumn;
 import com.alex.futurity.projectserver.entity.Task;
 import com.alex.futurity.projectserver.exception.ClientSideException;
@@ -40,6 +41,12 @@ public class TaskService {
         taskDao.deleteTask(columnId, taskId)
                 .filter(task -> task.hasDeadline() && !task.isCompleted())
                 .ifPresent(eventPublisher::publishDeleteEvent);
+    }
+
+    public TaskDto getTaskInfo(@NonNull Long taskId) {
+        return taskDao.findTaskById(taskId)
+                .map(TaskDto::fromTask)
+                .orElseThrow(() -> new IllegalArgumentException(String.format("Task with id %s not found", taskId)));
     }
 
     @Transactional
