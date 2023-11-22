@@ -1,0 +1,3 @@
+@Library('futurityPipelineLib') _
+
+javaPipeline()

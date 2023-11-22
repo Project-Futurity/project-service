@@ -4,6 +4,7 @@ spring:
   rabbitmq:
     username: ${RABBIT_USERNAME}
     password: ${RABBIT_PASSWORD}
+    addresses: ${RABBIT_NODE}
   cloud:
     stream:
       bindings:
@@ -15,8 +16,6 @@ spring:
             declare-exchange: false
             exchange-type: direct
             routing-key-expression: headers['type']
-        binder:
-          nodes: ${RABBIT_NODE}
       output-bindings: taskPublisher
   jpa:
     hibernate:
